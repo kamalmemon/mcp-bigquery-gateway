@@ -16,8 +16,10 @@ from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 from mcp.types import (
     CallToolResult,
+    ServerCapabilities,
     TextContent,
     Tool,
+    ToolsCapability,
 )
 
 from bigquery_client import BigQueryClient
@@ -311,9 +313,8 @@ class MCPBigQueryServer:
                 InitializationOptions(
                     server_name="mcp-bigquery-server",
                     server_version="1.0.0",
-                    capabilities=self.server.get_capabilities(
-                        notification_options=None,
-                        experimental_capabilities=None,
+                    capabilities=ServerCapabilities(
+                        tools=ToolsCapability()
                     ),
                 ),
             )

@@ -15,12 +15,38 @@ A Model Context Protocol (MCP) server that provides seamless integration with Go
 - Python 3.10+
 - [uv](https://docs.astral.sh/uv/) (for dependency management)
 - Google Cloud Project with BigQuery API enabled
-- Service account credentials or user authentication
+- [Google Cloud CLI (gcloud)](https://cloud.google.com/sdk/docs/install) installed
 - **Cursor Pro** (for IDE integration)
 
-## Installation
+## Quick Start
 
-1. Install uv (if not already installed):
+1. **Clone and install**:
+```bash
+git clone <repository-url>
+cd <repository-name>
+make install
+```
+
+2. **Authenticate with Google Cloud**:
+```bash
+make auth
+```
+
+3. **Set your Google Cloud project**:
+```bash
+gcloud config set project YOUR_PROJECT_ID
+```
+
+4. **Run the server**:
+```bash
+make run
+```
+
+## Detailed Installation
+
+### 1. Install Dependencies
+
+Install uv (if not already installed):
 ```bash
 # On macOS and Linux
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -32,44 +58,71 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 pip install uv
 ```
 
-2. Clone this repository:
+Install Google Cloud CLI:
+```bash
+# macOS
+brew install google-cloud-sdk
+
+# For other platforms, visit: https://cloud.google.com/sdk/docs/install
+```
+
+### 2. Clone and Setup
+
 ```bash
 git clone <repository-url>
 cd <repository-name>
+make setup  # This will install dependencies and authenticate
 ```
 
-3. Install dependencies with uv:
+### 3. Authentication
+
+The `make auth` command will:
+1. Authenticate you with Google Cloud (opens browser)
+2. Set up Application Default Credentials for the BigQuery client
+3. Guide you to set your default project
+
+You can check your authentication status anytime:
 ```bash
-uv sync
+make auth-check
 ```
-
-4. Set up Google Cloud authentication:
-   - Create a service account in your Google Cloud Console
-   - Download the service account key JSON file
-   - Set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to point to your key file
 
 ## Configuration
 
-Create a `.env` file in the root directory with your configuration:
+### Environment Variables (Optional)
+
+You can create a `.env` file for additional configuration:
 
 ```
-GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account-key.json
 PROJECT_ID=your-google-cloud-project-id
+# GOOGLE_APPLICATION_CREDENTIALS is not needed when using Application Default Credentials
+```
+
+### Alternative: Service Account Authentication
+
+If you prefer to use a service account JSON file instead of Application Default Credentials:
+
+1. Create a service account in Google Cloud Console
+2. Download the JSON key file
+3. Set the environment variable:
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account-key.json
 ```
 
 ## Running the MCP Server
 
-### Method 1: Direct Python Execution
-
-Start the MCP server directly:
+### Using Make (Recommended)
 
 ```bash
-uv run python src/mcp_bigquery_server.py
+make run
 ```
 
-### Method 2: Using the Installed Script
+### Manual Execution
 
 ```bash
+# Direct Python execution
+uv run python src/mcp_bigquery_server.py
+
+# Using the installed script
 uv run mcp-bigquery-server
 ```
 
@@ -170,28 +223,42 @@ or
 Execute this query: SELECT * FROM `your-project.your-dataset.your-table` LIMIT 10
 ```
 
+## Available Make Commands
+
+Run `make` or `make help` to see all available commands:
+
+- `make setup` - Complete setup (install + auth)
+- `make auth` - Authenticate with Google Cloud
+- `make auth-check` - Check authentication status
+- `make run` - Run the MCP server
+- `make test` - Run tests
+- `make lint` - Run linting checks
+- `make format` - Format code
+- `make clean` - Clean up cache files
+- `make info` - Show project information
+
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Server not starting**: 
-   - Check that all dependencies are installed: `uv sync`
-   - Verify Python version: `python --version` (should be 3.10+)
-   - Check Google Cloud credentials are properly configured
+1. **Authentication errors**: 
+   - Run `make auth-check` to verify your authentication status
+   - Run `make auth` to re-authenticate if needed
+   - Ensure your Google Cloud project has BigQuery API enabled
 
-2. **Cursor not recognizing the server**:
+2. **Server not starting**: 
+   - Check that all dependencies are installed: `make install`
+   - Verify Python version: `python --version` (should be 3.10+)
+   - Check authentication: `make auth-check`
+
+3. **Cursor not recognizing the server**:
    - Ensure the path in the configuration is absolute, not relative
    - Verify the configuration file is in the correct location
    - Restart Cursor completely after configuration changes
 
-3. **Permission errors**:
+4. **Permission errors**:
    - Make sure the Python script is executable
    - Check that the virtual environment has proper permissions
-
-4. **BigQuery authentication errors**:
-   - Verify your service account key file exists and is readable
-   - Check that the `GOOGLE_APPLICATION_CREDENTIALS` environment variable is set correctly
-   - Ensure your service account has BigQuery permissions
 
 ### Debugging
 
@@ -199,14 +266,19 @@ To debug connection issues:
 
 1. **Test the server manually**:
    ```bash
-   uv run python src/mcp_bigquery_server.py
+   make run
    ```
 
-2. **Check Cursor logs**:
+2. **Check authentication**:
+   ```bash
+   make auth-check
+   ```
+
+3. **Check Cursor logs**:
    - Open Cursor Developer Tools (Help → Toggle Developer Tools)
    - Look for MCP-related error messages in the console
 
-3. **Verify configuration**:
+4. **Verify configuration**:
    - Double-check JSON syntax in configuration files
    - Ensure all paths are correct and absolute
 
@@ -227,7 +299,7 @@ Once connected, your MCP server provides these tools:
 Install development dependencies:
 
 ```bash
-uv sync --extra dev
+make dev
 ```
 
 ### Project Structure
@@ -238,6 +310,7 @@ uv sync --extra dev
 │   ├── bigquery_client.py        # BigQuery client wrapper
 │   └── utils.py                  # Utility functions
 ├── tests/                        # Test files
+├── Makefile                      # Build and setup commands
 ├── pyproject.toml                # Project configuration and dependencies
 ├── cursor_config_example.json    # Example Cursor configuration
 ├── .env.example                  # Environment variables template
@@ -247,24 +320,14 @@ uv sync --extra dev
 ### Running Tests
 
 ```bash
-uv run pytest
+make test
 ```
 
 ### Code Formatting and Linting
 
-Format code with Black:
 ```bash
-uv run black src/ tests/
-```
-
-Lint with Ruff:
-```bash
-uv run ruff check src/ tests/
-```
-
-Type checking with mypy:
-```bash
-uv run mypy src/
+make format  # Format code
+make lint    # Check linting
 ```
 
 ### Adding Dependencies

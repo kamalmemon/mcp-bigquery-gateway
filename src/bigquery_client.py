@@ -27,40 +27,41 @@ class BigQueryClient:
 
         Args:
             project_id: Google Cloud project ID. If None, uses default from environment.
-            credentials_path: Path to service account JSON file. If None, uses default auth.
+            credentials_path: Path to service account JSON file. If None, uses Application Default Credentials.
         """
-        self.project_id = project_id or os.getenv("PROJECT_ID")
-        self.credentials_path = credentials_path or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        self.client = None
         self.executor = ThreadPoolExecutor(max_workers=4)
+        self.project_id = project_id
+        self.credentials_path = credentials_path
+        self.client = None
         self._initialize_client()
 
     def _initialize_client(self):
-        """Initialize the BigQuery client with proper authentication."""
+        """Initialize the BigQuery client with appropriate credentials."""
         try:
             if self.credentials_path and os.path.exists(self.credentials_path):
-                # Use service account credentials
+                # Use service account credentials if provided
+                logger.info(f"Using service account credentials from {self.credentials_path}")
                 credentials = service_account.Credentials.from_service_account_file(
                     self.credentials_path
                 )
                 self.client = bigquery.Client(
                     credentials=credentials, project=self.project_id or credentials.project_id
                 )
-                if not self.project_id:
-                    self.project_id = credentials.project_id
             else:
-                # Use default credentials (ADC)
-                credentials, project = google.auth.default()
-                self.client = bigquery.Client(
-                    credentials=credentials, project=self.project_id or project
-                )
-                if not self.project_id:
-                    self.project_id = project
+                # Use Application Default Credentials (recommended)
+                logger.info("Using Application Default Credentials")
+                self.client = bigquery.Client(project=self.project_id)
 
-            logger.info(f"BigQuery client initialized for project: {self.project_id}")
+            # Test the connection
+            self.client.get_service_account_email()
+            logger.info(f"Successfully connected to BigQuery with project: {self.client.project}")
 
         except Exception as e:
             logger.error(f"Failed to initialize BigQuery client: {str(e)}")
+            logger.error(
+                "Please ensure you are authenticated with Google Cloud. "
+                "Run 'make auth' or 'gcloud auth application-default login'"
+            )
             raise
 
     async def execute_query(

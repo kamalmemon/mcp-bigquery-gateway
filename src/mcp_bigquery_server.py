@@ -8,6 +8,7 @@ A Model Context Protocol server that provides BigQuery integration capabilities.
 import asyncio
 import json
 import logging
+import os
 from typing import Any
 
 from mcp.server import Server
@@ -32,7 +33,38 @@ class MCPBigQueryServer:
     def __init__(self):
         self.server = Server("mcp-bigquery-server")
         self.bigquery_client = None
+        self.project_id = self._get_project_id()
         self._setup_handlers()
+
+    def _get_project_id(self) -> str | None:
+        """Get project ID from environment or gcloud config."""
+        # First try environment variable
+        project_id = os.getenv("PROJECT_ID")
+        if project_id:
+            logger.info(f"Using project ID from environment: {project_id}")
+            return project_id
+        
+        # Try to get from gcloud config
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["gcloud", "config", "get-value", "project"],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            project_id = result.stdout.strip()
+            if project_id and project_id != "(unset)":
+                logger.info(f"Using project ID from gcloud config: {project_id}")
+                return project_id
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            logger.warning("Could not get project ID from gcloud config")
+        
+        logger.warning(
+            "No project ID found. Please set PROJECT_ID environment variable "
+            "or run 'gcloud config set project YOUR_PROJECT_ID'"
+        )
+        return None
 
     def _setup_handlers(self):
         """Set up MCP server handlers."""
@@ -128,7 +160,8 @@ class MCPBigQueryServer:
             """Handle tool calls."""
             try:
                 if not self.bigquery_client:
-                    self.bigquery_client = BigQueryClient()
+                    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+                    self.bigquery_client = BigQueryClient(project_id=self.project_id, credentials_path=credentials_path)
 
                 if name == "execute_query":
                     return await self._execute_query(arguments)
@@ -150,7 +183,7 @@ class MCPBigQueryServer:
     async def _execute_query(self, arguments: dict[str, Any]) -> CallToolResult:
         """Execute a BigQuery SQL query."""
         query = arguments["query"]
-        project_id = arguments.get("project_id")
+        project_id = arguments.get("project_id", self.project_id)
         max_results = arguments.get("max_results", 1000)
 
         # Validate query
@@ -180,7 +213,7 @@ class MCPBigQueryServer:
 
     async def _list_datasets(self, arguments: dict[str, Any]) -> CallToolResult:
         """List BigQuery datasets."""
-        project_id = arguments.get("project_id")
+        project_id = arguments.get("project_id", self.project_id)
 
         try:
             datasets = await self.bigquery_client.list_datasets(project_id=project_id)
@@ -198,7 +231,7 @@ class MCPBigQueryServer:
     async def _list_tables(self, arguments: dict[str, Any]) -> CallToolResult:
         """List tables in a BigQuery dataset."""
         dataset_id = arguments["dataset_id"]
-        project_id = arguments.get("project_id")
+        project_id = arguments.get("project_id", self.project_id)
 
         try:
             tables = await self.bigquery_client.list_tables(
@@ -218,7 +251,7 @@ class MCPBigQueryServer:
     async def _get_table_schema(self, arguments: dict[str, Any]) -> CallToolResult:
         """Get BigQuery table schema."""
         table_id = arguments["table_id"]
-        project_id = arguments.get("project_id")
+        project_id = arguments.get("project_id", self.project_id)
 
         try:
             schema = await self.bigquery_client.get_table_schema(
@@ -266,6 +299,10 @@ class MCPBigQueryServer:
     async def run(self):
         """Run the MCP server."""
         logger.info("Starting MCP BigQuery Server...")
+
+        # Initialize BigQuery client
+        credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        self.bigquery_client = BigQueryClient(project_id=self.project_id, credentials_path=credentials_path)
 
         async with stdio_server() as (read_stream, write_stream):
             await self.server.run(

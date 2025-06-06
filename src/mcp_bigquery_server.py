@@ -290,5 +290,10 @@ async def main():
     await server.run()
 
 
-if __name__ == "__main__":
+def main_sync():
+    """Synchronous main entry point for script execution."""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    main_sync()

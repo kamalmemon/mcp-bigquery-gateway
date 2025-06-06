@@ -12,24 +12,37 @@ A Model Context Protocol (MCP) server that provides seamless integration with Go
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.10+
+- [uv](https://docs.astral.sh/uv/) (for dependency management)
 - Google Cloud Project with BigQuery API enabled
 - Service account credentials or user authentication
 
 ## Installation
 
-1. Clone this repository:
+1. Install uv (if not already installed):
+```bash
+# On macOS and Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# On Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Or with pip
+pip install uv
+```
+
+2. Clone this repository:
 ```bash
 git clone <repository-url>
 cd <repository-name>
 ```
 
-2. Install dependencies:
+3. Install dependencies with uv:
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
-3. Set up Google Cloud authentication:
+4. Set up Google Cloud authentication:
    - Create a service account in your Google Cloud Console
    - Download the service account key JSON file
    - Set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to point to your key file
@@ -48,12 +61,26 @@ PROJECT_ID=your-google-cloud-project-id
 Start the MCP server:
 
 ```bash
-python src/mcp_bigquery_server.py
+uv run python src/mcp_bigquery_server.py
+```
+
+Or use the installed script:
+
+```bash
+uv run mcp-bigquery-server
 ```
 
 The server will be available for MCP clients to connect and execute BigQuery operations.
 
 ## Development
+
+### Setup Development Environment
+
+Install development dependencies:
+
+```bash
+uv sync --extra dev
+```
 
 ### Project Structure
 
@@ -63,7 +90,7 @@ The server will be available for MCP clients to connect and execute BigQuery ope
 │   ├── bigquery_client.py        # BigQuery client wrapper
 │   └── utils.py                  # Utility functions
 ├── tests/                        # Test files
-├── requirements.txt              # Python dependencies
+├── pyproject.toml                # Project configuration and dependencies
 ├── .env.example                  # Environment variables template
 └── README.md                     # This file
 ```
@@ -71,7 +98,36 @@ The server will be available for MCP clients to connect and execute BigQuery ope
 ### Running Tests
 
 ```bash
-python -m pytest tests/
+uv run pytest
+```
+
+### Code Formatting and Linting
+
+Format code with Black:
+```bash
+uv run black src/ tests/
+```
+
+Lint with Ruff:
+```bash
+uv run ruff check src/ tests/
+```
+
+Type checking with mypy:
+```bash
+uv run mypy src/
+```
+
+### Adding Dependencies
+
+Add a new dependency:
+```bash
+uv add package-name
+```
+
+Add a development dependency:
+```bash
+uv add --dev package-name
 ```
 
 ## License

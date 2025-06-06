@@ -19,37 +19,8 @@ class TestValidateSqlQuery:
         query = "SELECT * FROM users WHERE id = 1"
         assert validate_sql_query(query) is True
 
-    def test_invalid_drop_query(self):
-        """Test that DROP queries are rejected."""
-        query = "DROP TABLE users"
-        assert validate_sql_query(query) is False
-
-    def test_invalid_delete_query(self):
-        """Test that DELETE queries are rejected."""
-        query = "DELETE FROM users WHERE id = 1"
-        assert validate_sql_query(query) is False
-
-    def test_invalid_insert_query(self):
-        """Test that INSERT queries are rejected."""
-        query = "INSERT INTO users (name) VALUES ('test')"
-        assert validate_sql_query(query) is False
-
-    def test_empty_query(self):
-        """Test that empty queries are rejected."""
-        assert validate_sql_query("") is False
-        assert validate_sql_query(None) is False
-
-    def test_query_with_comments(self):
-        """Test that queries with comments are handled correctly."""
-        query = """
-        SELECT * FROM users
-        -- This is a comment
-        WHERE id = 1
-        """
-        assert validate_sql_query(query) is True
-
-    def test_complex_select_query(self):
-        """Test that complex SELECT queries pass validation."""
+    def test_valid_select_with_joins(self):
+        """Test that SELECT queries with JOINs pass validation."""
         query = """
         SELECT u.name, p.title
         FROM users u
@@ -58,6 +29,155 @@ class TestValidateSqlQuery:
         ORDER BY p.created_at DESC
         """
         assert validate_sql_query(query) is True
+
+    def test_valid_with_query(self):
+        """Test that WITH (CTE) queries pass validation."""
+        query = """
+        WITH active_users AS (
+            SELECT * FROM users WHERE active = true
+        )
+        SELECT * FROM active_users
+        """
+        assert validate_sql_query(query) is True
+
+    def test_valid_simple_expressions(self):
+        """Test that simple SELECT expressions pass validation."""
+        assert validate_sql_query("SELECT 1") is True
+        assert validate_sql_query("SELECT CURRENT_TIMESTAMP()") is True
+        assert validate_sql_query("SELECT 'hello world'") is True
+
+    # DDL Operations (should all fail)
+    def test_invalid_create_table(self):
+        """Test that CREATE TABLE queries are rejected."""
+        query = "CREATE TABLE test (id INT, name STRING)"
+        assert validate_sql_query(query) is False
+
+    def test_invalid_drop_table(self):
+        """Test that DROP TABLE queries are rejected."""
+        query = "DROP TABLE users"
+        assert validate_sql_query(query) is False
+
+    def test_invalid_alter_table(self):
+        """Test that ALTER TABLE queries are rejected."""
+        query = "ALTER TABLE users ADD COLUMN email STRING"
+        assert validate_sql_query(query) is False
+
+    def test_invalid_truncate_table(self):
+        """Test that TRUNCATE TABLE queries are rejected."""
+        query = "TRUNCATE TABLE users"
+        assert validate_sql_query(query) is False
+
+    # DML Operations (should all fail)
+    def test_invalid_insert_query(self):
+        """Test that INSERT queries are rejected."""
+        query = "INSERT INTO users (name) VALUES ('test')"
+        assert validate_sql_query(query) is False
+
+    def test_invalid_update_query(self):
+        """Test that UPDATE queries are rejected."""
+        query = "UPDATE users SET name = 'test' WHERE id = 1"
+        assert validate_sql_query(query) is False
+
+    def test_invalid_delete_query(self):
+        """Test that DELETE queries are rejected."""
+        query = "DELETE FROM users WHERE id = 1"
+        assert validate_sql_query(query) is False
+
+    def test_invalid_merge_query(self):
+        """Test that MERGE queries are rejected."""
+        query = "MERGE users USING new_users ON users.id = new_users.id"
+        assert validate_sql_query(query) is False
+
+    # DCL Operations (should all fail)
+    def test_invalid_grant_query(self):
+        """Test that GRANT queries are rejected."""
+        query = "GRANT SELECT ON users TO user@domain.com"
+        assert validate_sql_query(query) is False
+
+    def test_invalid_revoke_query(self):
+        """Test that REVOKE queries are rejected."""
+        query = "REVOKE SELECT ON users FROM user@domain.com"
+        assert validate_sql_query(query) is False
+
+    # Procedure calls (should all fail)
+    def test_invalid_exec_query(self):
+        """Test that EXEC queries are rejected."""
+        query = "EXEC sp_procedure"
+        assert validate_sql_query(query) is False
+
+    def test_invalid_call_query(self):
+        """Test that CALL queries are rejected."""
+        query = "CALL my_procedure()"
+        assert validate_sql_query(query) is False
+
+    # BigQuery specific operations (should all fail)
+    def test_invalid_export_data(self):
+        """Test that EXPORT DATA queries are rejected."""
+        query = "EXPORT DATA OPTIONS(uri='gs://bucket/file') AS SELECT * FROM users"
+        assert validate_sql_query(query) is False
+
+    def test_invalid_load_data(self):
+        """Test that LOAD DATA queries are rejected."""
+        query = "LOAD DATA INTO users FROM FILES('gs://bucket/file')"
+        assert validate_sql_query(query) is False
+
+    # Edge cases and security tests
+    def test_invalid_nested_write_operations(self):
+        """Test that nested write operations in SELECT are rejected."""
+        query = "SELECT * FROM (INSERT INTO users VALUES (1, 'test'))"
+        assert validate_sql_query(query) is False
+
+    def test_invalid_with_write_operations(self):
+        """Test that WITH clauses containing write operations are rejected."""
+        query = """
+        WITH temp AS (
+            INSERT INTO users VALUES (1, 'test')
+        )
+        SELECT * FROM temp
+        """
+        assert validate_sql_query(query) is False
+
+    def test_invalid_case_variations(self):
+        """Test that case variations of blocked operations are rejected."""
+        assert validate_sql_query("Insert Into users VALUES (1)") is False
+        assert validate_sql_query("UPDATE users set name='test'") is False
+        assert validate_sql_query("Delete From users") is False
+        assert validate_sql_query("CREATE table test (id int)") is False
+
+    def test_invalid_with_comments(self):
+        """Test that blocked operations with comments are still rejected."""
+        query = """
+        /* This is a comment */
+        INSERT INTO users (name) VALUES ('test')
+        -- Another comment
+        """
+        assert validate_sql_query(query) is False
+
+    def test_empty_and_invalid_inputs(self):
+        """Test that empty and invalid inputs are rejected."""
+        assert validate_sql_query("") is False
+        assert validate_sql_query(None) is False
+        assert validate_sql_query("   ") is False
+        assert validate_sql_query("INVALID SQL") is False
+
+    def test_query_length_limits(self):
+        """Test that extremely long queries are rejected."""
+        # Create a very long query
+        long_query = "SELECT * FROM users WHERE " + " OR ".join([f"id = {i}" for i in range(10000)])
+        assert validate_sql_query(long_query) is False
+
+    def test_excessive_nesting(self):
+        """Test that queries with excessive nesting are rejected."""
+        # Create a deeply nested query
+        nested_query = "SELECT * FROM users WHERE id IN (" * 30 + "SELECT 1" + ")" * 30
+        assert validate_sql_query(nested_query) is False
+
+    def test_excessive_joins(self):
+        """Test that queries with too many JOINs are rejected."""
+        # Create a query with many JOINs
+        joins = " ".join([f"JOIN table{i} t{i} ON t{i-1}.id = t{i}.id" for i in range(1, 60)])
+        query = f"SELECT * FROM table0 t0 {joins}"
+        assert validate_sql_query(query) is False
 
 
 class TestSanitizeTableName:
@@ -123,20 +243,35 @@ class TestIsQueryReadOnly:
 
     def test_select_query(self):
         """Test that SELECT queries are detected as read-only."""
-        query = "SELECT * FROM users"
+        query = "select * from users"
         assert is_query_read_only(query) is True
 
     def test_with_query(self):
         """Test that WITH queries are detected as read-only."""
-        query = "WITH temp AS (SELECT * FROM users) SELECT * FROM temp"
+        query = "with temp as (select * from users) select * from temp"
         assert is_query_read_only(query) is True
 
     def test_insert_query(self):
         """Test that INSERT queries are not read-only."""
-        query = "INSERT INTO users (name) VALUES ('test')"
+        query = "insert into users (name) values ('test')"
         assert is_query_read_only(query) is False
 
     def test_update_query(self):
         """Test that UPDATE queries are not read-only."""
-        query = "UPDATE users SET name = 'test' WHERE id = 1"
+        query = "update users set name = 'test' where id = 1"
+        assert is_query_read_only(query) is False
+
+    def test_delete_query(self):
+        """Test that DELETE queries are not read-only."""
+        query = "delete from users where id = 1"
+        assert is_query_read_only(query) is False
+
+    def test_create_query(self):
+        """Test that CREATE queries are not read-only."""
+        query = "create table test (id int)"
+        assert is_query_read_only(query) is False
+
+    def test_non_select_start(self):
+        """Test that queries not starting with SELECT or WITH are not read-only."""
+        query = "show tables"
         assert is_query_read_only(query) is False

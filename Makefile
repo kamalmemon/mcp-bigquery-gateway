@@ -1,7 +1,7 @@
 # MCP BigQuery Server Makefile
 # Provides convenient commands for setup, authentication, and development
 
-.PHONY: help install auth auth-check setup dev test lint format clean run
+.PHONY: help install auth auth-check setup dev test lint format clean run cursor-setup
 
 # Default target
 help:
@@ -10,6 +10,7 @@ help:
 	@echo "Setup Commands:"
 	@echo "  make install     - Install dependencies with uv"
 	@echo "  make setup       - Complete setup (install + auth)"
+	@echo "  make cursor-setup - Set up virtual environment and display Cursor config"
 	@echo ""
 	@echo "Authentication Commands:"
 	@echo "  make auth        - Authenticate with Google Cloud (interactive)"
@@ -123,4 +124,29 @@ info: check-gcloud
 	@gcloud config get-value project 2>/dev/null || echo "No default project set"
 	@echo ""
 	@echo "Available BigQuery datasets (if authenticated):"
-	@bq ls 2>/dev/null || echo "Unable to list datasets. Check authentication and project setup." 
+	@bq ls 2>/dev/null || echo "Unable to list datasets. Check authentication and project setup."
+
+cursor-setup: ## Set up virtual environment for Cursor MCP integration
+	@echo "Setting up virtual environment for Cursor MCP integration..."
+	uv sync
+	@echo ""
+	@echo "✅ Virtual environment created successfully!"
+	@echo ""
+	@echo "📋 Add this configuration to your Cursor settings:"
+	@echo ""
+	@echo "{"
+	@echo "  \"mcpServers\": {"
+	@echo "    \"bigquery\": {"
+	@echo "      \"command\": \"$(shell pwd)/.venv/bin/python\","
+	@echo "      \"args\": [\"-m\", \"src.mcp_bigquery_server\"],"
+	@echo "      \"env\": {"
+	@echo "        \"GOOGLE_CLOUD_PROJECT\": \"your-project-id\""
+	@echo "      }"
+	@echo "    }"
+	@echo "  }"
+	@echo "}"
+	@echo ""
+	@echo "💡 Remember to:"
+	@echo "   1. Replace 'your-project-id' with your actual Google Cloud project ID"
+	@echo "   2. Run 'make auth' to authenticate with Google Cloud"
+	@echo "   3. Restart Cursor after adding the configuration" 

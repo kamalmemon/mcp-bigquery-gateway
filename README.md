@@ -37,10 +37,12 @@ make auth
 gcloud config set project YOUR_PROJECT_ID
 ```
 
-4. **Run the server**:
+4. **Set up for Cursor integration**:
 ```bash
-make run
+make cursor-setup
 ```
+
+5. **Add the displayed configuration to Cursor and restart**
 
 ## Detailed Installation
 
@@ -130,9 +132,26 @@ The server will start and listen for MCP client connections via stdio (standard 
 
 ## Connecting to Cursor
 
-To integrate your MCP BigQuery Server with Cursor, you need to configure Cursor to recognize and use your server.
+### Quick Setup (Recommended)
 
-### Step 1: Locate Cursor Configuration
+The easiest way to set up Cursor integration is using the automated setup command:
+
+```bash
+make cursor-setup
+```
+
+This command will:
+1. Create the virtual environment with all dependencies
+2. Display the exact configuration you need to add to Cursor
+3. Show you the next steps
+
+Simply copy the displayed JSON configuration and add it to your Cursor settings, then restart Cursor.
+
+### Manual Setup
+
+To integrate your MCP BigQuery Server with Cursor manually, you need to configure Cursor to recognize and use your server.
+
+#### Step 1: Locate Cursor Configuration
 
 Find your Cursor configuration directory:
 
@@ -140,7 +159,7 @@ Find your Cursor configuration directory:
 - **Windows**: `%APPDATA%\Cursor\User\globalStorage\cursor.mcp\`
 - **Linux**: `~/.config/Cursor/User/globalStorage/cursor.mcp/`
 
-### Step 2: Create or Edit MCP Configuration
+#### Step 2: Create or Edit MCP Configuration
 
 Create or edit the `settings.json` file in the configuration directory. You can use the provided example as a template:
 
@@ -175,25 +194,25 @@ Or create the file manually with this content:
 
 **Important**: Replace `/absolute/path/to/your/project` with the actual absolute path to your project directory.
 
-### Step 3: Alternative Configuration (Using Virtual Environment)
+#### Step 3: Alternative Configuration (Using Virtual Environment)
 
-If you prefer to use the virtual environment directly:
+If you prefer to use the virtual environment directly (as shown by `make cursor-setup`):
 
 ```json
 {
   "mcpServers": {
     "bigquery": {
       "command": "/absolute/path/to/your/project/.venv/bin/python",
-      "args": [
-        "/absolute/path/to/your/project/src/mcp_bigquery_server.py"
-      ],
-      "cwd": "/absolute/path/to/your/project"
+      "args": ["-m", "src.mcp_bigquery_server"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "your-project-id"
+      }
     }
   }
 }
 ```
 
-### Step 4: Restart Cursor
+#### Step 4: Restart Cursor
 
 After saving the configuration:
 
@@ -228,6 +247,7 @@ Execute this query: SELECT * FROM `your-project.your-dataset.your-table` LIMIT 1
 Run `make` or `make help` to see all available commands:
 
 - `make setup` - Complete setup (install + auth)
+- `make cursor-setup` - Set up virtual environment and display Cursor configuration
 - `make auth` - Authenticate with Google Cloud
 - `make auth-check` - Check authentication status
 - `make run` - Run the MCP server

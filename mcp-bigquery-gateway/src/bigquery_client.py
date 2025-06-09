@@ -189,10 +189,7 @@ class BigQueryClient:
                         "dataset_id": dataset.dataset_id,
                         "project": dataset.project,
                         "full_dataset_id": dataset.full_dataset_id,
-                        "created": dataset.created.isoformat() if dataset.created else None,
-                        "modified": dataset.modified.isoformat() if dataset.modified else None,
-                        "description": dataset.description,
-                        "location": dataset.location,
+                        "labels": getattr(dataset, "labels", {}),
                     }
                 )
 
@@ -242,10 +239,13 @@ class BigQueryClient:
                         "project": table.project,
                         "full_table_id": table.full_table_id,
                         "table_type": table.table_type,
-                        "created": table.created.isoformat() if table.created else None,
-                        "modified": table.modified.isoformat() if table.modified else None,
-                        "num_rows": table.num_rows,
-                        "num_bytes": table.num_bytes,
+                        "creation_time": (
+                            table.creation_time.isoformat() if hasattr(table, "creation_time") and table.creation_time else None
+                        ),
+                        "expiration_time": (
+                            table.expiration_time.isoformat() if hasattr(table, "expiration_time") and table.expiration_time else None
+                        ),
+                        "labels": getattr(table, "labels", {}),
                     }
                 )
 

@@ -45,7 +45,7 @@ build:
 	GCLOUD_PATH="$$HOME/.config/gcloud" && \
 	echo "{" && \
 	echo "  \"mcpServers\": {" && \
-	echo "    \"bigquery\": {" && \
+	echo "    \"mcp-bigquery-gateway\": {" && \
 	echo "      \"command\": \"docker\"," && \
 	echo "      \"args\": [" && \
 	echo "        \"run\", \"-i\", \"--rm\"," && \

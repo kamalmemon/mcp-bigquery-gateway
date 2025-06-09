@@ -36,7 +36,29 @@ build:
 	@echo "🐳 Step 3: Building Docker image..."
 	docker build -t mcp-bigquery-gateway .
 	@echo ""
-	@echo "✅ Build complete! Run with: make run"
+	@echo "✅ Build complete!"
+	@echo ""
+	@echo "📋 Cursor MCP Configuration:"
+	@echo "Copy this to your Cursor MCP settings (.cursor/mcp.json):"
+	@echo ""
+	@PROJECT_ID=$$(gcloud config get-value project 2>/dev/null) && \
+	GCLOUD_PATH="$$HOME/.config/gcloud" && \
+	echo "{" && \
+	echo "  \"mcpServers\": {" && \
+	echo "    \"bigquery\": {" && \
+	echo "      \"command\": \"docker\"," && \
+	echo "      \"args\": [" && \
+	echo "        \"run\", \"-i\", \"--rm\"," && \
+	echo "        \"-e\", \"PROJECT_ID=$$PROJECT_ID\"," && \
+	echo "        \"-v\", \"$$GCLOUD_PATH:/home/app/.config/gcloud:ro\"," && \
+	echo "        \"mcp-bigquery-gateway\"" && \
+	echo "      ]" && \
+	echo "    }" && \
+	echo "  }" && \
+	echo "}"
+	@echo ""
+	@echo "💡 Save this to: ~/.cursor/mcp.json (global) or ./.cursor/mcp.json (project-specific)"
+	@echo "💡 Then restart Cursor"
 
 run:
 	@echo "🚀 Starting MCP BigQuery Gateway in Docker..."

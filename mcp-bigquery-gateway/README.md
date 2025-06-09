@@ -2,7 +2,7 @@
 
 A Model Context Protocol (MCP) server for Google BigQuery integration with AI assistants.
 
-**🐳 Docker Required**: This project is designed to run in Docker for simplicity and consistency.
+**🐳 Docker Required**: This project runs in Docker for simplicity and consistency.
 
 ## Features
 
@@ -18,24 +18,51 @@ A Model Context Protocol (MCP) server for Google BigQuery integration with AI as
 - [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
 - Google Cloud Project with BigQuery API enabled
 
-## Quick Start
+## Setup
+
+### 1. Clone and Authenticate
 
 ```bash
-# 1. Clone and setup
+# Clone the repository
 git clone <repository-url>
 cd mcp-bigquery-gateway
 
-# 2. Authenticate with Google Cloud
+# Authenticate with Google Cloud
 make auth
 
-# 3. Set your project
+# Set your project
 gcloud config set project YOUR_PROJECT_ID
+```
 
-# 4. Build (includes auth check and tests)
+### 2. Build Docker Container
+
+```bash
+# Build the Docker image and generate Cursor configuration
 make build
+```
 
-# 5. Run
+The `make build` command will:
+- ✅ Verify Google Cloud authentication
+- 🧪 Run all tests
+- 🐳 Build the Docker container locally
+- 📋 Generate the Cursor MCP configuration JSON
+
+### 3. Configure Cursor
+
+After `make build` completes, it will display a JSON configuration. Copy this JSON and save it to either:
+
+- **Global configuration**: `~/.cursor/mcp.json` (applies to all projects)
+- **Project-specific**: `./.cursor/mcp.json` (applies only to this project)
+
+Then restart Cursor.
+
+### 4. Test the Setup
+
+```bash
+# Test the container runs correctly
 make run
+
+# You should see the MCP server start and wait for connections
 ```
 
 ## Usage
@@ -43,38 +70,15 @@ make run
 ### Commands
 
 - `make auth` - Setup Google Cloud authentication
-- `make build` - Build Docker image (auto-checks auth and runs tests)
+- `make build` - Build Docker image and show Cursor config
 - `make run` - Start interactive Docker container
 - `make test` - Run tests locally
 - `make format` - Format and lint code
 - `make clean` - Clean up
 
-### Cursor Integration
+### Available Tools
 
-Add this to your Cursor MCP settings:
-
-```json
-{
-  "mcpServers": {
-    "bigquery": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "PROJECT_ID=your-project-id",
-        "-v", "/Users/yourusername/.config/gcloud:/home/app/.config/gcloud:ro",
-        "mcp-bigquery-gateway"
-      ]
-    }
-  }
-}
-```
-
-**Remember to**:
-- Replace `your-project-id` with your actual Google Cloud project ID
-- Update the gcloud config path for your system
-- Build the image first: `make build`
-
-## Available Tools
+Once configured in Cursor, these tools will be available:
 
 - `execute_query` - Execute SQL queries
 - `list_datasets` - List BigQuery datasets
@@ -85,9 +89,16 @@ Add this to your Cursor MCP settings:
 ## Authentication
 
 The Docker container uses your local Google Cloud credentials:
-- Run `make auth` to authenticate
+- Run `make auth` to authenticate with Google Cloud
 - Your `~/.config/gcloud` directory is mounted read-only into the container
-- Set your project with: `gcloud config set project YOUR_PROJECT_ID`
+- The configuration automatically uses your current project from `gcloud config get-value project`
+
+## Troubleshooting
+
+- **"No project set"**: Run `gcloud config set project YOUR_PROJECT_ID`
+- **"Not authenticated"**: Run `make auth`
+- **"Docker image not found"**: Run `make build` first
+- **Cursor not connecting**: Ensure you saved the JSON to the correct `.cursor/mcp.json` file and restarted Cursor
 
 ## License
 

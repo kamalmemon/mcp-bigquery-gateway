@@ -89,4 +89,5 @@ test_*.py
 
 # Development files
 Makefile
-cursor_config_example.json 
+cursor_config_example.json
+docker-run.sh 

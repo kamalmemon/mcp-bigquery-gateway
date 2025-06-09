@@ -4,6 +4,18 @@ A Model Context Protocol (MCP) server for Google BigQuery integration with AI as
 
 **🐳 Docker Required**: This project runs in Docker for simplicity and consistency.
 
+## ⚠️ Disclaimer
+
+This code was largely generated through AI-assisted development ("vibe coding"). While it has been tested, we make no guarantees about correctness, security, or reliability. Use at your own risk in production environments.
+
+## 🔒 Security Notice
+
+This server enforces **read-only access** and only allows:
+- `SELECT` queries for data retrieval
+- `WITH` clauses (Common Table Expressions) that lead to SELECT statements
+
+All DDL (CREATE, DROP, ALTER), DML (INSERT, UPDATE, DELETE), and other write operations are blocked for security.
+
 ## Features
 
 - Execute SQL queries on BigQuery

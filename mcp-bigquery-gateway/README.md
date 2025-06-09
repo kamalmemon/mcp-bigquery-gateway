@@ -1,12 +1,13 @@
 # MCP BigQuery Gateway
 
-A Model Context Protocol (MCP) server for Google BigQuery integration with AI assistants.
+A [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server for Google BigQuery integration with AI assistants.
 
 ⚠️ Disclaimer: This code is largely generated through AI-assisted development ("vibe coding"). While it has been tested, we make no guarantees about correctness, security, or reliability. Use at your own risk in production environments.
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) **🐳 Required**: This project runs in Docker for simplicity and consistency
+**Required**
+- [🐳 Docker](https://docs.docker.com/get-docker/) 
 - [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
 - Google Cloud Project with BigQuery API enabled
 
@@ -14,8 +15,20 @@ A Model Context Protocol (MCP) server for Google BigQuery integration with AI as
 
 - List datasets and tables  
 - Get table schemas
+- Execute SQL queries 
+    - With **🔒 read-only access** - Only `SELECT` queries and `WITH` clauses (Common Table Expressions) are allowed. All DDL (CREATE, DROP, ALTER), DML (INSERT, UPDATE, DELETE), and other write operations are blocked for security.
 - Query validation
-- Execute SQL queries with **🔒 read-only access** - Only `SELECT` queries and `WITH` clauses (Common Table Expressions) are allowed. All DDL (CREATE, DROP, ALTER), DML (INSERT, UPDATE, DELETE), and other write operations are blocked for security.
+
+### Available Tools
+
+Once configured, these tools will be available:
+
+- `execute_query` - Execute SQL queries
+- `list_datasets` - List BigQuery datasets  
+- `list_tables` - List tables in a dataset
+- `get_table_schema` - Get table schema
+- `validate_query` - Validate SQL queries
+
 
 ## Setup
 
@@ -76,16 +89,6 @@ make run
 - `make test` - Run tests locally
 - `make format` - Format and lint code
 - `make clean` - Clean up
-
-### Available Tools
-
-Once configured in Cursor, these tools will be available:
-
-- `execute_query` - Execute SQL queries
-- `list_datasets` - List BigQuery datasets  
-- `list_tables` - List tables in a dataset
-- `get_table_schema` - Get table schema
-- `validate_query` - Validate SQL queries
 
 ## Authentication
 

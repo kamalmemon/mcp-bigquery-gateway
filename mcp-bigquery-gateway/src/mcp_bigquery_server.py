@@ -69,7 +69,7 @@ def get_bigquery_client() -> BigQueryClient:
 
 
 # Create the server instance
-server = Server("mcp-bigquery-server")
+server = Server("mcp-bigquery-gateway")
 
 
 @server.list_tools()
@@ -279,7 +279,7 @@ async def main():
                 read_stream,
                 write_stream,
                 InitializationOptions(
-                    server_name="mcp-bigquery-server",
+                    server_name="mcp-bigquery-gateway",
                     server_version="1.0.0",
                     capabilities=server.get_capabilities(
                         notification_options=NotificationOptions(),

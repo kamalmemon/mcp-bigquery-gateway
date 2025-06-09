@@ -488,7 +488,7 @@ wheels = [
 ]
 
 [[package]]
-name = "mcp-bigquery-server"
+name = "mcp-bigquery-gateway"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [

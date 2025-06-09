@@ -125,7 +125,7 @@ make run
 uv run python src/mcp_bigquery_server.py
 
 # Using the installed script
-uv run mcp-bigquery-server
+uv run mcp-bigquery-gateway
 ```
 
 The server will start and listen for MCP client connections via stdio (standard input/output).

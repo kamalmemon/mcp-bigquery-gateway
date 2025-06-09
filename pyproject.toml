@@ -46,7 +46,7 @@ Repository = "https://github.com/yourusername/mcp-bigquery-server"
 Issues = "https://github.com/yourusername/mcp-bigquery-server/issues"
 
 [project.scripts]
-mcp-bigquery-server = "mcp_bigquery_server:main_sync"
+mcp-bigquery-server = "mcp_bigquery_server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]

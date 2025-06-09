@@ -9,18 +9,13 @@ import asyncio
 import json
 import logging
 import os
-from typing import Any
+import sys
+from typing import Any, Dict, List, Sequence
 
-from mcp.server import Server
+import mcp.server.stdio
+import mcp.types as types
+from mcp.server import NotificationOptions, Server
 from mcp.server.models import InitializationOptions
-from mcp.server.stdio import stdio_server
-from mcp.types import (
-    CallToolResult,
-    ServerCapabilities,
-    TextContent,
-    Tool,
-    ToolsCapability,
-)
 
 from bigquery_client import BigQueryClient
 from utils import setup_logging, validate_sql_query
@@ -28,310 +23,274 @@ from utils import setup_logging, validate_sql_query
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Global BigQuery client
+bigquery_client: BigQueryClient | None = None
 
-class MCPBigQueryServer:
-    """MCP Server for BigQuery operations."""
 
-    def __init__(self):
-        self.server = Server("mcp-bigquery-server")
-        self.bigquery_client = None
-        self.project_id = self._get_project_id()
-        self._setup_handlers()
-
-    def _get_project_id(self) -> str | None:
-        """Get project ID from environment or gcloud config."""
-        # First try environment variable
-        project_id = os.getenv("PROJECT_ID")
-        if project_id:
-            logger.info(f"Using project ID from environment: {project_id}")
-            return project_id
-        
-        # Try to get from gcloud config
-        try:
-            import subprocess
-            result = subprocess.run(
-                ["gcloud", "config", "get-value", "project"],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            project_id = result.stdout.strip()
-            if project_id and project_id != "(unset)":
-                logger.info(f"Using project ID from gcloud config: {project_id}")
-                return project_id
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            logger.warning("Could not get project ID from gcloud config")
-        
-        logger.warning(
-            "No project ID found. Please set PROJECT_ID environment variable "
-            "or run 'gcloud config set project YOUR_PROJECT_ID'"
+def get_project_id() -> str | None:
+    """Get project ID from environment or gcloud config."""
+    # First try environment variable
+    project_id = os.getenv("PROJECT_ID")
+    if project_id:
+        logger.info(f"Using project ID from environment: {project_id}")
+        return project_id
+    
+    # Try to get from gcloud config
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["gcloud", "config", "get-value", "project"],
+            capture_output=True,
+            text=True,
+            check=True
         )
-        return None
+        project_id = result.stdout.strip()
+        if project_id and project_id != "(unset)":
+            logger.info(f"Using project ID from gcloud config: {project_id}")
+            return project_id
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        logger.warning("Could not get project ID from gcloud config")
+    
+    logger.warning(
+        "No project ID found. Please set PROJECT_ID environment variable "
+        "or run 'gcloud config set project YOUR_PROJECT_ID'"
+    )
+    return None
 
-    def _setup_handlers(self):
-        """Set up MCP server handlers."""
 
-        @self.server.list_tools()
-        async def list_tools() -> list[Tool]:
-            """List available BigQuery tools."""
-            return [
-                Tool(
-                    name="execute_query",
-                    description="Execute a SQL query against BigQuery and return results",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "query": {"type": "string", "description": "SQL query to execute"},
-                            "project_id": {
-                                "type": "string",
-                                "description": "Google Cloud project ID (optional, uses default)",
-                            },
-                            "max_results": {
-                                "type": "integer",
-                                "description": "Maximum number of results (default: 1000)",
-                                "default": 1000,
-                            },
-                        },
-                        "required": ["query"],
-                    },
-                ),
-                Tool(
-                    name="list_datasets",
-                    description="List all datasets in a BigQuery project",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "project_id": {
-                                "type": "string",
-                                "description": "Google Cloud project ID (optional, uses default)",
-                            }
-                        },
-                    },
-                ),
-                Tool(
-                    name="list_tables",
-                    description="List all tables in a BigQuery dataset",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "dataset_id": {
-                                "type": "string",
-                                "description": "Dataset ID to list tables from",
-                            },
-                            "project_id": {
-                                "type": "string",
-                                "description": "Google Cloud project ID (optional, uses default)",
-                            },
-                        },
-                        "required": ["dataset_id"],
-                    },
-                ),
-                Tool(
-                    name="get_table_schema",
-                    description="Get the schema of a BigQuery table",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "table_id": {
-                                "type": "string",
-                                "description": "Table ID in format 'dataset.table'",
-                            },
-                            "project_id": {
-                                "type": "string",
-                                "description": "Google Cloud project ID (optional, uses default)",
-                            },
-                        },
-                        "required": ["table_id"],
-                    },
-                ),
-                Tool(
-                    name="validate_query",
-                    description="Validate a SQL query without executing it",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "query": {"type": "string", "description": "SQL query to validate"}
-                        },
-                        "required": ["query"],
-                    },
-                ),
-            ]
-
-        @self.server.call_tool()
-        async def call_tool(name: str, arguments: dict[str, Any]) -> CallToolResult:
-            """Handle tool calls."""
-            try:
-                if not self.bigquery_client:
-                    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-                    self.bigquery_client = BigQueryClient(project_id=self.project_id, credentials_path=credentials_path)
-
-                if name == "execute_query":
-                    return await self._execute_query(arguments)
-                elif name == "list_datasets":
-                    return await self._list_datasets(arguments)
-                elif name == "list_tables":
-                    return await self._list_tables(arguments)
-                elif name == "get_table_schema":
-                    return await self._get_table_schema(arguments)
-                elif name == "validate_query":
-                    return await self._validate_query(arguments)
-                else:
-                    raise ValueError(f"Unknown tool: {name}")
-
-            except Exception as e:
-                logger.error(f"Error executing tool {name}: {str(e)}")
-                return CallToolResult(content=[TextContent(type="text", text=f"Error: {str(e)}")])
-
-    async def _execute_query(self, arguments: dict[str, Any]) -> CallToolResult:
-        """Execute a BigQuery SQL query."""
-        query = arguments["query"]
-        project_id = arguments.get("project_id", self.project_id)
-        max_results = arguments.get("max_results", 1000)
-
-        # Validate query
-        if not validate_sql_query(query):
-            return CallToolResult(
-                content=[
-                    TextContent(type="text", text="Error: Invalid or potentially unsafe SQL query")
-                ]
-            )
-
-        try:
-            results = await self.bigquery_client.execute_query(
-                query, project_id=project_id, max_results=max_results
-            )
-
-            # Format results as JSON
-            result_text = json.dumps(results, indent=2, default=str)
-
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"Query Results:\n{result_text}")]
-            )
-
-        except Exception as e:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"Query execution error: {str(e)}")]
-            )
-
-    async def _list_datasets(self, arguments: dict[str, Any]) -> CallToolResult:
-        """List BigQuery datasets."""
-        project_id = arguments.get("project_id", self.project_id)
-
-        try:
-            datasets = await self.bigquery_client.list_datasets(project_id=project_id)
-            result_text = json.dumps(datasets, indent=2)
-
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"Datasets:\n{result_text}")]
-            )
-
-        except Exception as e:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"Error listing datasets: {str(e)}")]
-            )
-
-    async def _list_tables(self, arguments: dict[str, Any]) -> CallToolResult:
-        """List tables in a BigQuery dataset."""
-        dataset_id = arguments["dataset_id"]
-        project_id = arguments.get("project_id", self.project_id)
-
-        try:
-            tables = await self.bigquery_client.list_tables(
-                dataset_id=dataset_id, project_id=project_id
-            )
-            result_text = json.dumps(tables, indent=2)
-
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"Tables in {dataset_id}:\n{result_text}")]
-            )
-
-        except Exception as e:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"Error listing tables: {str(e)}")]
-            )
-
-    async def _get_table_schema(self, arguments: dict[str, Any]) -> CallToolResult:
-        """Get BigQuery table schema."""
-        table_id = arguments["table_id"]
-        project_id = arguments.get("project_id", self.project_id)
-
-        try:
-            schema = await self.bigquery_client.get_table_schema(
-                table_id=table_id, project_id=project_id
-            )
-            result_text = json.dumps(schema, indent=2)
-
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"Schema for {table_id}:\n{result_text}")]
-            )
-
-        except Exception as e:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"Error getting table schema: {str(e)}")]
-            )
-
-    async def _validate_query(self, arguments: dict[str, Any]) -> CallToolResult:
-        """Validate a SQL query."""
-        query = arguments["query"]
-
-        try:
-            is_valid = validate_sql_query(query)
-            if is_valid:
-                # Also validate with BigQuery dry run
-                validation_result = await self.bigquery_client.validate_query(query)
-                return CallToolResult(
-                    content=[
-                        TextContent(type="text", text=f"Query validation: {validation_result}")
-                    ]
-                )
-            else:
-                return CallToolResult(
-                    content=[
-                        TextContent(
-                            type="text", text="Query validation failed: Invalid or unsafe query"
-                        )
-                    ]
-                )
-
-        except Exception as e:
-            return CallToolResult(
-                content=[TextContent(type="text", text=f"Validation error: {str(e)}")]
-            )
-
-    async def run(self):
-        """Run the MCP server."""
-        logger.info("Starting MCP BigQuery Server...")
-
-        # Initialize BigQuery client
+def get_bigquery_client() -> BigQueryClient:
+    """Get or create BigQuery client."""
+    global bigquery_client
+    if bigquery_client is None:
+        project_id = get_project_id()
         credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        self.bigquery_client = BigQueryClient(project_id=self.project_id, credentials_path=credentials_path)
+        bigquery_client = BigQueryClient(project_id=project_id, credentials_path=credentials_path)
+    return bigquery_client
 
-        async with stdio_server() as (read_stream, write_stream):
-            await self.server.run(
+
+# Create the server instance
+server = Server("mcp-bigquery-server")
+
+
+@server.list_tools()
+async def handle_list_tools() -> list[types.Tool]:
+    """List available tools."""
+    return [
+        types.Tool(
+            name="execute_query",
+            description="Execute a SQL query against BigQuery and return results",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "SQL query to execute"
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Google Cloud project ID (optional)"
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return",
+                        "default": 1000
+                    }
+                },
+                "required": ["query"]
+            }
+        ),
+        types.Tool(
+            name="list_datasets",
+            description="List all datasets in a BigQuery project",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "string",
+                        "description": "Google Cloud project ID (optional)"
+                    }
+                }
+            }
+        ),
+        types.Tool(
+            name="list_tables",
+            description="List all tables in a BigQuery dataset",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "dataset_id": {
+                        "type": "string",
+                        "description": "Dataset ID to list tables from"
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Google Cloud project ID (optional)"
+                    }
+                },
+                "required": ["dataset_id"]
+            }
+        ),
+        types.Tool(
+            name="get_table_schema",
+            description="Get the schema of a BigQuery table",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "table_id": {
+                        "type": "string",
+                        "description": "Table ID in format 'dataset.table'"
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Google Cloud project ID (optional)"
+                    }
+                },
+                "required": ["table_id"]
+            }
+        ),
+        types.Tool(
+            name="validate_query",
+            description="Validate a SQL query without executing it",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "SQL query to validate"
+                    }
+                },
+                "required": ["query"]
+            }
+        )
+    ]
+
+
+@server.call_tool()
+async def handle_call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
+    """Handle tool calls."""
+    if arguments is None:
+        arguments = {}
+
+    try:
+        if name == "execute_query":
+            query = arguments.get("query")
+            if not query:
+                return [types.TextContent(type="text", text="Error: query parameter is required")]
+            
+            # Validate query
+            if not validate_sql_query(query):
+                return [types.TextContent(type="text", text="Error: Invalid or potentially unsafe SQL query")]
+
+            client = get_bigquery_client()
+            project_id = arguments.get("project_id")
+            max_results = arguments.get("max_results", 1000)
+            
+            results = await client.execute_query(query, project_id=project_id, max_results=max_results)
+            
+            return [types.TextContent(
+                type="text", 
+                text=f"Query Results:\n{json.dumps(results, indent=2, default=str)}"
+            )]
+        
+        elif name == "list_datasets":
+            client = get_bigquery_client()
+            project_id = arguments.get("project_id")
+            
+            datasets = await client.list_datasets(project_id=project_id)
+            
+            return [types.TextContent(
+                type="text",
+                text=f"Datasets:\n{json.dumps(datasets, indent=2)}"
+            )]
+        
+        elif name == "list_tables":
+            dataset_id = arguments.get("dataset_id")
+            if not dataset_id:
+                return [types.TextContent(type="text", text="Error: dataset_id parameter is required")]
+            
+            client = get_bigquery_client()
+            project_id = arguments.get("project_id")
+            
+            tables = await client.list_tables(dataset_id=dataset_id, project_id=project_id)
+            
+            return [types.TextContent(
+                type="text",
+                text=f"Tables in {dataset_id}:\n{json.dumps(tables, indent=2)}"
+            )]
+        
+        elif name == "get_table_schema":
+            table_id = arguments.get("table_id")
+            if not table_id:
+                return [types.TextContent(type="text", text="Error: table_id parameter is required")]
+            
+            client = get_bigquery_client()
+            project_id = arguments.get("project_id")
+            
+            schema = await client.get_table_schema(table_id=table_id, project_id=project_id)
+            
+            return [types.TextContent(
+                type="text",
+                text=f"Schema for {table_id}:\n{json.dumps(schema, indent=2)}"
+            )]
+        
+        elif name == "validate_query":
+            query = arguments.get("query")
+            if not query:
+                return [types.TextContent(type="text", text="Error: query parameter is required")]
+            
+            # Basic validation
+            is_valid = validate_sql_query(query)
+            if not is_valid:
+                return [types.TextContent(type="text", text="Query validation failed: Invalid or unsafe query")]
+            
+            # BigQuery dry run validation
+            client = get_bigquery_client()
+            validation_result = await client.validate_query(query)
+            
+            return [types.TextContent(
+                type="text",
+                text=f"Query validation: {json.dumps(validation_result, indent=2)}"
+            )]
+        
+        else:
+            return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
+    
+    except Exception as e:
+        logger.error(f"Error in tool {name}: {str(e)}")
+        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+
+
+async def main():
+    """Main entry point."""
+    # Use environment variable for log level, default to WARNING for MCP Inspector
+    log_level = os.getenv("LOG_LEVEL", "WARNING")
+    setup_logging(log_level)
+    logger.info("Starting MCP BigQuery Server...")
+    
+    try:
+        # Initialize BigQuery client
+        get_bigquery_client()
+        logger.info("BigQuery client initialized successfully")
+        
+        # Run the server
+        async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+            logger.info("Server running with stdio transport")
+            await server.run(
                 read_stream,
                 write_stream,
                 InitializationOptions(
                     server_name="mcp-bigquery-server",
                     server_version="1.0.0",
-                    capabilities=ServerCapabilities(
-                        tools=ToolsCapability()
+                    capabilities=server.get_capabilities(
+                        notification_options=NotificationOptions(),
+                        experimental_capabilities={},
                     ),
                 ),
             )
-
-
-async def main():
-    """Main entry point."""
-    setup_logging()
-
-    server = MCPBigQueryServer()
-    await server.run()
-
-
-def main_sync():
-    """Synchronous main entry point for script execution."""
-    asyncio.run(main())
+    except Exception as e:
+        logger.error(f"Server error: {str(e)}")
+        raise
 
 
 if __name__ == "__main__":
-    main_sync()
+    asyncio.run(main())

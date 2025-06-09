@@ -57,7 +57,7 @@ BLOCKED_OPERATIONS = [
 ]
 
 
-def setup_logging(level: str = "INFO") -> None:
+def setup_logging(level: str = "WARNING") -> None:
     """
     Set up logging configuration.
 

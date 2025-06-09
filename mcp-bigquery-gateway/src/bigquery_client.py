@@ -10,7 +10,6 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-import google.auth
 from google.cloud import bigquery
 from google.cloud.exceptions import GoogleCloudError
 from google.oauth2 import service_account
@@ -27,7 +26,7 @@ class BigQueryClient:
 
         Args:
             project_id: Google Cloud project ID. If None, uses default from environment.
-            credentials_path: Path to service account JSON file. If None, uses Application Default Credentials.
+            credentials_path: Path to service account JSON file. If None, uses ADC.
         """
         self.executor = ThreadPoolExecutor(max_workers=4)
         self.project_id = project_id
@@ -189,6 +188,7 @@ class BigQueryClient:
                         "dataset_id": dataset.dataset_id,
                         "project": dataset.project,
                         "full_dataset_id": dataset.full_dataset_id,
+                        "friendly_name": getattr(dataset, "friendly_name", None),
                         "labels": getattr(dataset, "labels", {}),
                     }
                 )
@@ -240,11 +240,16 @@ class BigQueryClient:
                         "full_table_id": table.full_table_id,
                         "table_type": table.table_type,
                         "creation_time": (
-                            table.creation_time.isoformat() if hasattr(table, "creation_time") and table.creation_time else None
+                            table.creation_time.isoformat()
+                            if hasattr(table, "creation_time") and table.creation_time
+                            else None
                         ),
                         "expiration_time": (
-                            table.expiration_time.isoformat() if hasattr(table, "expiration_time") and table.expiration_time else None
+                            table.expiration_time.isoformat()
+                            if hasattr(table, "expiration_time") and table.expiration_time
+                            else None
                         ),
+                        "friendly_name": getattr(table, "friendly_name", None),
                         "labels": getattr(table, "labels", {}),
                     }
                 )

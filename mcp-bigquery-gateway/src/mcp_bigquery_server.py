@@ -9,8 +9,6 @@ import asyncio
 import json
 import logging
 import os
-import sys
-from typing import Any, Dict, List, Sequence
 
 import mcp.server.stdio
 import mcp.types as types
@@ -34,15 +32,13 @@ def get_project_id() -> str | None:
     if project_id:
         logger.info(f"Using project ID from environment: {project_id}")
         return project_id
-    
+
     # Try to get from gcloud config
     try:
         import subprocess
+
         result = subprocess.run(
-            ["gcloud", "config", "get-value", "project"],
-            capture_output=True,
-            text=True,
-            check=True
+            ["gcloud", "config", "get-value", "project"], capture_output=True, text=True, check=True
         )
         project_id = result.stdout.strip()
         if project_id and project_id != "(unset)":
@@ -50,7 +46,7 @@ def get_project_id() -> str | None:
             return project_id
     except (subprocess.CalledProcessError, FileNotFoundError):
         logger.warning("Could not get project ID from gcloud config")
-    
+
     logger.warning(
         "No project ID found. Please set PROJECT_ID environment variable "
         "or run 'gcloud config set project YOUR_PROJECT_ID'"
@@ -82,22 +78,19 @@ async def handle_list_tools() -> list[types.Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "SQL query to execute"
-                    },
+                    "query": {"type": "string", "description": "SQL query to execute"},
                     "project_id": {
                         "type": "string",
-                        "description": "Google Cloud project ID (optional)"
+                        "description": "Google Cloud project ID (optional)",
                     },
                     "max_results": {
                         "type": "integer",
                         "description": "Maximum number of results to return",
-                        "default": 1000
-                    }
+                        "default": 1000,
+                    },
                 },
-                "required": ["query"]
-            }
+                "required": ["query"],
+            },
         ),
         types.Tool(
             name="list_datasets",
@@ -107,10 +100,10 @@ async def handle_list_tools() -> list[types.Tool]:
                 "properties": {
                     "project_id": {
                         "type": "string",
-                        "description": "Google Cloud project ID (optional)"
+                        "description": "Google Cloud project ID (optional)",
                     }
-                }
-            }
+                },
+            },
         ),
         types.Tool(
             name="list_tables",
@@ -120,15 +113,15 @@ async def handle_list_tools() -> list[types.Tool]:
                 "properties": {
                     "dataset_id": {
                         "type": "string",
-                        "description": "Dataset ID to list tables from"
+                        "description": "Dataset ID to list tables from",
                     },
                     "project_id": {
                         "type": "string",
-                        "description": "Google Cloud project ID (optional)"
-                    }
+                        "description": "Google Cloud project ID (optional)",
+                    },
                 },
-                "required": ["dataset_id"]
-            }
+                "required": ["dataset_id"],
+            },
         ),
         types.Tool(
             name="get_table_schema",
@@ -138,30 +131,25 @@ async def handle_list_tools() -> list[types.Tool]:
                 "properties": {
                     "table_id": {
                         "type": "string",
-                        "description": "Table ID in format 'dataset.table'"
+                        "description": "Table ID in format 'dataset.table'",
                     },
                     "project_id": {
                         "type": "string",
-                        "description": "Google Cloud project ID (optional)"
-                    }
+                        "description": "Google Cloud project ID (optional)",
+                    },
                 },
-                "required": ["table_id"]
-            }
+                "required": ["table_id"],
+            },
         ),
         types.Tool(
             name="validate_query",
             description="Validate a SQL query without executing it",
             inputSchema={
                 "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "SQL query to validate"
-                    }
-                },
-                "required": ["query"]
-            }
-        )
+                "properties": {"query": {"type": "string", "description": "SQL query to validate"}},
+                "required": ["query"],
+            },
+        ),
     ]
 
 
@@ -176,85 +164,103 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
             query = arguments.get("query")
             if not query:
                 return [types.TextContent(type="text", text="Error: query parameter is required")]
-            
+
             # Validate query
             if not validate_sql_query(query):
-                return [types.TextContent(type="text", text="Error: Invalid or potentially unsafe SQL query")]
+                return [
+                    types.TextContent(
+                        type="text", text="Error: Invalid or potentially unsafe SQL query"
+                    )
+                ]
 
             client = get_bigquery_client()
             project_id = arguments.get("project_id")
             max_results = arguments.get("max_results", 1000)
-            
-            results = await client.execute_query(query, project_id=project_id, max_results=max_results)
-            
-            return [types.TextContent(
-                type="text", 
-                text=f"Query Results:\n{json.dumps(results, indent=2, default=str)}"
-            )]
-        
+
+            results = await client.execute_query(
+                query, project_id=project_id, max_results=max_results
+            )
+
+            return [
+                types.TextContent(
+                    type="text",
+                    text=f"Query Results:\n{json.dumps(results, indent=2, default=str)}",
+                )
+            ]
+
         elif name == "list_datasets":
             client = get_bigquery_client()
             project_id = arguments.get("project_id")
-            
+
             datasets = await client.list_datasets(project_id=project_id)
-            
-            return [types.TextContent(
-                type="text",
-                text=f"Datasets:\n{json.dumps(datasets, indent=2)}"
-            )]
-        
+
+            return [
+                types.TextContent(type="text", text=f"Datasets:\n{json.dumps(datasets, indent=2)}")
+            ]
+
         elif name == "list_tables":
             dataset_id = arguments.get("dataset_id")
             if not dataset_id:
-                return [types.TextContent(type="text", text="Error: dataset_id parameter is required")]
-            
+                return [
+                    types.TextContent(type="text", text="Error: dataset_id parameter is required")
+                ]
+
             client = get_bigquery_client()
             project_id = arguments.get("project_id")
-            
+
             tables = await client.list_tables(dataset_id=dataset_id, project_id=project_id)
-            
-            return [types.TextContent(
-                type="text",
-                text=f"Tables in {dataset_id}:\n{json.dumps(tables, indent=2)}"
-            )]
-        
+
+            return [
+                types.TextContent(
+                    type="text", text=f"Tables in {dataset_id}:\n{json.dumps(tables, indent=2)}"
+                )
+            ]
+
         elif name == "get_table_schema":
             table_id = arguments.get("table_id")
             if not table_id:
-                return [types.TextContent(type="text", text="Error: table_id parameter is required")]
-            
+                return [
+                    types.TextContent(type="text", text="Error: table_id parameter is required")
+                ]
+
             client = get_bigquery_client()
             project_id = arguments.get("project_id")
-            
+
             schema = await client.get_table_schema(table_id=table_id, project_id=project_id)
-            
-            return [types.TextContent(
-                type="text",
-                text=f"Schema for {table_id}:\n{json.dumps(schema, indent=2)}"
-            )]
-        
+
+            return [
+                types.TextContent(
+                    type="text", text=f"Schema for {table_id}:\n{json.dumps(schema, indent=2)}"
+                )
+            ]
+
         elif name == "validate_query":
             query = arguments.get("query")
             if not query:
                 return [types.TextContent(type="text", text="Error: query parameter is required")]
-            
+
             # Basic validation
             is_valid = validate_sql_query(query)
             if not is_valid:
-                return [types.TextContent(type="text", text="Query validation failed: Invalid or unsafe query")]
-            
+                return [
+                    types.TextContent(
+                        type="text", text="Query validation failed: Invalid or unsafe query"
+                    )
+                ]
+
             # BigQuery dry run validation
             client = get_bigquery_client()
             validation_result = await client.validate_query(query)
-            
-            return [types.TextContent(
-                type="text",
-                text=f"Query validation: {json.dumps(validation_result, indent=2)}"
-            )]
-        
+
+            return [
+                types.TextContent(
+                    type="text", text=f"Query validation: {json.dumps(validation_result, indent=2)}"
+                )
+            ]
+
         else:
             return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
-    
+
     except Exception as e:
         logger.error(f"Error in tool {name}: {str(e)}")
         return [types.TextContent(type="text", text=f"Error: {str(e)}")]
@@ -266,12 +272,12 @@ async def main():
     log_level = os.getenv("LOG_LEVEL", "WARNING")
     setup_logging(log_level)
     logger.info("Starting MCP BigQuery Server...")
-    
+
     try:
         # Initialize BigQuery client
         get_bigquery_client()
         logger.info("BigQuery client initialized successfully")
-        
+
         # Run the server
         async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
             logger.info("Server running with stdio transport")

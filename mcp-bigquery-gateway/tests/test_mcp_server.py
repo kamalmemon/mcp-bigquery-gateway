@@ -5,7 +5,6 @@ Simple test script for MCP BigQuery Server
 
 import asyncio
 import json
-import subprocess
 import sys
 from typing import Any
 
@@ -31,7 +30,7 @@ class MCPTester:
 
         request_json = json.dumps(request) + "\n"
         print(f"→ Sending: {method}")
-        
+
         self.process.stdin.write(request_json.encode())
         await self.process.stdin.drain()
 
@@ -50,7 +49,10 @@ class MCPTester:
             # Start the server process
             print("🚀 Starting MCP BigQuery Server...")
             self.process = await asyncio.create_subprocess_exec(
-                "uv", "run", "python", "src/mcp_bigquery_server.py",
+                "uv",
+                "run",
+                "python",
+                "src/mcp_bigquery_server.py",
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -62,21 +64,22 @@ class MCPTester:
             print("\n📋 Testing MCP Protocol...")
 
             # 1. Initialize
-            init_response = await self.send_request("initialize", {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "roots": {"listChanged": True},
-                    "sampling": {}
+            init_response = await self.send_request(
+                "initialize",
+                {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {"roots": {"listChanged": True}, "sampling": {}},
+                    "clientInfo": {"name": "mcp-tester", "version": "1.0.0"},
                 },
-                "clientInfo": {"name": "mcp-tester", "version": "1.0.0"}
-            })
+            )
 
             if "error" in init_response:
                 print(f"❌ Initialization failed: {init_response['error']}")
                 return False
 
             print("✅ Server initialized successfully!")
-            print(f"   Server: {init_response['result']['serverInfo']['name']} v{init_response['result']['serverInfo']['version']}")
+            server_info = init_response["result"]["serverInfo"]
+            print(f"   Server: {server_info['name']} v{server_info['version']}")
 
             # 2. Send initialized notification
             await self.send_initialized_notification()
@@ -87,17 +90,16 @@ class MCPTester:
                 print(f"❌ Tools list failed: {tools_response['error']}")
                 return False
 
-            tools = tools_response['result']['tools']
+            tools = tools_response["result"]["tools"]
             print(f"✅ Found {len(tools)} tools:")
             for tool in tools:
                 print(f"   • {tool['name']}: {tool['description']}")
 
             # 4. Test a simple tool (validate_query)
             print("\n🔧 Testing query validation tool...")
-            validate_response = await self.send_request("tools/call", {
-                "name": "validate_query",
-                "arguments": {"query": "SELECT 1 as test"}
-            })
+            validate_response = await self.send_request(
+                "tools/call", {"name": "validate_query", "arguments": {"query": "SELECT 1 as test"}}
+            )
 
             if "error" in validate_response:
                 print(f"❌ Tool call failed: {validate_response['error']}")
@@ -133,10 +135,10 @@ async def main():
     """Main test function."""
     print("🧪 MCP BigQuery Server Test Suite")
     print("=" * 40)
-    
+
     tester = MCPTester()
     success = await tester.test_server()
-    
+
     if success:
         print("\n✅ Server is ready for use!")
         sys.exit(0)
@@ -146,4 +148,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())

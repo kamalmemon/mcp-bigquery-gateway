@@ -1,153 +1,80 @@
-# MCP BigQuery Server Makefile
-# Provides convenient commands for setup, authentication, and development
+# MCP BigQuery Gateway - Docker-First Makefile
 
-.PHONY: help install auth auth-check setup dev test lint format clean run cursor-setup
+.PHONY: help auth build run test format clean
 
-# Default target
 help:
-	@echo "MCP BigQuery Server - Available Commands:"
+	@echo "MCP BigQuery Gateway (Docker-First)"
 	@echo ""
-	@echo "Setup Commands:"
-	@echo "  make install     - Install dependencies with uv"
-	@echo "  make setup       - Complete setup (install + auth)"
-	@echo "  make cursor-setup - Set up virtual environment and display Cursor config"
-	@echo ""
-	@echo "Authentication Commands:"
-	@echo "  make auth        - Authenticate with Google Cloud (interactive)"
-	@echo "  make auth-check  - Check current authentication status"
-	@echo ""
-	@echo "Development Commands:"
-	@echo "  make dev         - Install development dependencies"
-	@echo "  make test        - Run tests"
-	@echo "  make lint        - Run linting checks"
-	@echo "  make format      - Format code with black and ruff"
-	@echo ""
-	@echo "Server Commands:"
-	@echo "  make run         - Run the MCP server"
-	@echo ""
-	@echo "Utility Commands:"
-	@echo "  make clean       - Clean up cache and temporary files"
+	@echo "Commands:"
+	@echo "  auth   - Setup Google Cloud authentication"
+	@echo "  build  - Build Docker image (includes auth check and tests)"
+	@echo "  run    - Run interactive Docker container"
+	@echo "  test   - Run tests locally"
+	@echo "  format - Format and lint code"
+	@echo "  clean  - Clean up"
 
-# Install dependencies
-install:
-	@echo "Installing dependencies with uv..."
-	uv sync
-
-# Install development dependencies
-dev:
-	@echo "Installing development dependencies..."
-	uv sync --extra dev
-
-# Check if gcloud is installed
-check-gcloud:
-	@which gcloud > /dev/null || (echo "Error: gcloud CLI is not installed. Please install it first:" && \
-		echo "  macOS: brew install google-cloud-sdk" && \
-		echo "  Linux: https://cloud.google.com/sdk/docs/install" && \
-		echo "  Windows: https://cloud.google.com/sdk/docs/install" && \
-		exit 1)
-
-# Authenticate with Google Cloud
-auth: check-gcloud
-	@echo "Authenticating with Google Cloud..."
-	@echo "This will open a browser window for authentication."
+auth:
+	@echo "🔐 Setting up Google Cloud authentication..."
+	@which gcloud > /dev/null || (echo "❌ Error: gcloud CLI not installed. Install from: https://cloud.google.com/sdk/docs/install" && exit 1)
+	@echo "Opening browser for Google Cloud authentication..."
 	gcloud auth login
-	@echo ""
-	@echo "Setting up Application Default Credentials..."
 	gcloud auth application-default login
-	@echo ""
 	@echo "✅ Authentication complete!"
-	@echo ""
-	@echo "Optional: Set your default project with:"
-	@echo "  gcloud config set project YOUR_PROJECT_ID"
+	@echo "💡 Remember to set your project: gcloud config set project YOUR_PROJECT_ID"
 
-# Check authentication status
-auth-check: check-gcloud
-	@echo "Checking Google Cloud authentication status..."
+build:
+	@echo "🏗️  Building MCP BigQuery Gateway..."
 	@echo ""
-	@echo "Current authenticated account:"
-	@gcloud auth list --filter=status:ACTIVE --format="table(account,status)" || echo "No active authentication found"
+	@echo "📋 Step 1: Checking Google Cloud authentication..."
+	@gcloud auth application-default print-access-token > /dev/null 2>&1 || \
+		(echo "❌ Not authenticated. Running 'make auth'..." && make auth)
+	@echo "✅ Authentication verified"
 	@echo ""
-	@echo "Application Default Credentials:"
-	@gcloud auth application-default print-access-token > /dev/null 2>&1 && \
-		echo "✅ Application Default Credentials are configured" || \
-		echo "❌ Application Default Credentials not found. Run 'make auth' to set up."
+	@echo "🧪 Step 2: Running tests..."
+	@make test
 	@echo ""
-	@echo "Current project:"
-	@gcloud config get-value project 2>/dev/null || echo "No default project set"
+	@echo "🐳 Step 3: Building Docker image..."
+	docker build -t mcp-bigquery-gateway .
+	@echo ""
+	@echo "✅ Build complete! Run with: make run"
 
-# Complete setup
-setup: install auth
-	@echo ""
-	@echo "🎉 Setup complete! Your MCP BigQuery Server is ready to use."
-	@echo ""
-	@echo "Next steps:"
-	@echo "1. Set your default project: gcloud config set project YOUR_PROJECT_ID"
-	@echo "2. Configure Cursor with the provided example config"
-	@echo "3. Run the server: make run"
+run:
+	@echo "🚀 Starting MCP BigQuery Gateway in Docker..."
+	@PROJECT_ID=$$(gcloud config get-value project 2>/dev/null) && \
+	if [ -z "$$PROJECT_ID" ] || [ "$$PROJECT_ID" = "(unset)" ]; then \
+		echo "❌ No Google Cloud project set. Please run:"; \
+		echo "   gcloud config set project YOUR_PROJECT_ID"; \
+		exit 1; \
+	fi && \
+	echo "📊 Using project: $$PROJECT_ID" && \
+	docker run -it --rm \
+		-e PROJECT_ID=$$PROJECT_ID \
+		-v "$$HOME/.config/gcloud:/home/app/.config/gcloud:ro" \
+		mcp-bigquery-gateway
 
-# Run tests
 test:
-	@echo "Running tests..."
-	uv run pytest
+	@echo "🧪 Running tests..."
+	@if [ ! -d ".venv" ]; then \
+		echo "Creating virtual environment..."; \
+		uv sync; \
+	fi
+	uv run pytest tests/ -v
 
-# Run linting
-lint:
-	@echo "Running linting checks..."
-	uv run ruff check src/ tests/
-
-# Format code
 format:
-	@echo "Formatting code..."
+	@echo "🎨 Formatting and linting code..."
+	@if [ ! -d ".venv" ]; then \
+		echo "Creating virtual environment..."; \
+		uv sync; \
+	fi
 	uv run black src/ tests/
 	uv run ruff check --fix src/ tests/
+	@echo "✅ Code formatted and linted"
 
-# Run the MCP server
-run:
-	@echo "Starting MCP BigQuery Server..."
-	@echo "Press Ctrl+C to stop the server"
-	uv run python src/mcp_bigquery_server.py
-
-# Clean up
 clean:
-	@echo "Cleaning up cache and temporary files..."
-	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete 2>/dev/null || true
-	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
-	@echo "✅ Cleanup complete!"
-
-# Show project info
-info: check-gcloud
-	@echo "MCP BigQuery Server Project Information:"
-	@echo ""
-	@echo "Current Google Cloud Project:"
-	@gcloud config get-value project 2>/dev/null || echo "No default project set"
-	@echo ""
-	@echo "Available BigQuery datasets (if authenticated):"
-	@bq ls 2>/dev/null || echo "Unable to list datasets. Check authentication and project setup."
-
-cursor-setup: ## Set up virtual environment for Cursor MCP integration
-	@echo "Setting up virtual environment for Cursor MCP integration..."
-	uv sync
-	@echo ""
-	@echo "✅ Virtual environment created successfully!"
-	@echo ""
-	@echo "📋 Add this configuration to your Cursor settings:"
-	@echo ""
-	@echo "{"
-	@echo "  \"mcpServers\": {"
-	@echo "    \"bigquery\": {"
-	@echo "      \"command\": \"uv\","
-	@echo "      \"args\": [\"run\", \"python\", \"-m\", \"src.mcp_bigquery_server\"],"
-	@echo "      \"cwd\": \"$(shell pwd)\","
-	@echo "      \"env\": {"
-	@echo "        \"GOOGLE_CLOUD_PROJECT\": \"your-project-id\""
-	@echo "      }"
-	@echo "    }"
-	@echo "  }"
-	@echo "}"
-	@echo ""
-	@echo "💡 Remember to:"
-	@echo "   1. Replace 'your-project-id' with your actual Google Cloud project ID"
-	@echo "   2. Run 'make auth' to authenticate with Google Cloud"
-	@echo "   3. Restart Cursor after adding the configuration" 
+	@echo "🧹 Cleaning up..."
+	find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+	find . -name "*.pyc" -delete 2>/dev/null || true
+	find . -name ".pytest_cache" -type d -exec rm -rf {} + 2>/dev/null || true
+	find . -name ".ruff_cache" -type d -exec rm -rf {} + 2>/dev/null || true
+	docker system prune -f 2>/dev/null || true
+	@echo "✅ Cleanup complete" 

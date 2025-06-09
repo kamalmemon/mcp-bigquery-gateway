@@ -4,6 +4,7 @@
 
 # Google Cloud credentials
 *.json
+!examples/*.json
 service-account-*.json
 credentials/
 

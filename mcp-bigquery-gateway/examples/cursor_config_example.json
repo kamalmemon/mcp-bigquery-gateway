@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "bigquery": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "PROJECT_ID=your-project-id",
+        "-v", "/Users/yourusername/.config/gcloud:/home/app/.config/gcloud:ro",
+        "mcp-bigquery-gateway"
+      ]
+    }
+  }
+} 

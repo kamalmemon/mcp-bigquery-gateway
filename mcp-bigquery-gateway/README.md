@@ -2,33 +2,20 @@
 
 A Model Context Protocol (MCP) server for Google BigQuery integration with AI assistants.
 
-**🐳 Docker Required**: This project runs in Docker for simplicity and consistency.
-
-## ⚠️ Disclaimer
-
-This code was largely generated through AI-assisted development ("vibe coding"). While it has been tested, we make no guarantees about correctness, security, or reliability. Use at your own risk in production environments.
-
-## 🔒 Security Notice
-
-This server enforces **read-only access** and only allows:
-- `SELECT` queries for data retrieval
-- `WITH` clauses (Common Table Expressions) that lead to SELECT statements
-
-All DDL (CREATE, DROP, ALTER), DML (INSERT, UPDATE, DELETE), and other write operations are blocked for security.
-
-## Features
-
-- Execute SQL queries on BigQuery
-- List datasets and tables
-- Get table schemas
-- Query validation
-- Secure read-only access
+⚠️ Disclaimer: This code is largely generated through AI-assisted development ("vibe coding"). While it has been tested, we make no guarantees about correctness, security, or reliability. Use at your own risk in production environments.
 
 ## Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/)
+- [Docker](https://docs.docker.com/get-docker/) **🐳 Required**: This project runs in Docker for simplicity and consistency
 - [Google Cloud CLI](https://cloud.google.com/sdk/docs/install)
 - Google Cloud Project with BigQuery API enabled
+
+## Features
+
+- List datasets and tables  
+- Get table schemas
+- Query validation
+- Execute SQL queries with **🔒 read-only access** - Only `SELECT` queries and `WITH` clauses (Common Table Expressions) are allowed. All DDL (CREATE, DROP, ALTER), DML (INSERT, UPDATE, DELETE), and other write operations are blocked for security.
 
 ## Setup
 
@@ -66,6 +53,8 @@ After `make build` completes, it will display a JSON configuration. Copy this JS
 - **Global configuration**: `~/.cursor/mcp.json` (applies to all projects)
 - **Project-specific**: `./.cursor/mcp.json` (applies only to this project)
 
+> 💡 **Tip**: You can also find an example configuration in [examples/cursor_config_example.json](examples/cursor_config_example.json)
+
 Then restart Cursor.
 
 ### 4. Test the Setup
@@ -83,7 +72,7 @@ make run
 
 - `make auth` - Setup Google Cloud authentication
 - `make build` - Build Docker image and show Cursor config
-- `make run` - Start interactive Docker container
+- `make run` - Start interactive Docker container  
 - `make test` - Run tests locally
 - `make format` - Format and lint code
 - `make clean` - Clean up
@@ -93,7 +82,7 @@ make run
 Once configured in Cursor, these tools will be available:
 
 - `execute_query` - Execute SQL queries
-- `list_datasets` - List BigQuery datasets
+- `list_datasets` - List BigQuery datasets  
 - `list_tables` - List tables in a dataset
 - `get_table_schema` - Get table schema
 - `validate_query` - Validate SQL queries
@@ -108,10 +97,10 @@ The Docker container uses your local Google Cloud credentials:
 ## Troubleshooting
 
 - **"No project set"**: Run `gcloud config set project YOUR_PROJECT_ID`
-- **"Not authenticated"**: Run `make auth`
+- **"Not authenticated"**: Run `make auth` 
 - **"Docker image not found"**: Run `make build` first
 - **Cursor not connecting**: Ensure you saved the JSON to the correct `.cursor/mcp.json` file and restarted Cursor
 
 ## License
 
-MIT 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 

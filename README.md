@@ -36,7 +36,7 @@ Once configured, these tools will be available:
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/kamalmemon/mcp-bigquery-gateway.git
 cd mcp-bigquery-gateway
 
 # Authenticate with Google Cloud

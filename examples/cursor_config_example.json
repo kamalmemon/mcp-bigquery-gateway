@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "bigquery": {
+    "mcp-bigquery-gateway": {
       "command": "docker",
       "args": [
         "run", "-i", "--rm",

@@ -19,6 +19,27 @@ A [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) s
     - With **🔒 read-only access** - Only `SELECT` queries and `WITH` clauses (Common Table Expressions) are allowed. All DDL (CREATE, DROP, ALTER), DML (INSERT, UPDATE, DELETE), and other write operations are blocked for security.
 - Query validation
 
+### Query Validation
+
+The `validate_query` tool uses BigQuery's dry run feature to validate queries without execution:
+
+- Validates SQL syntax
+- Shows bytes that will be processed and billed
+- Returns expected result schema
+- Free and instant execution
+
+Example response:
+```json
+{
+  "valid": true,
+  "total_bytes_processed": 1048576,
+  "total_bytes_billed": 10485760,
+  "schema": [{"name": "column_name", "type": "STRING"}]
+}
+```
+
+Use this to catch errors and estimate costs before running queries.
+
 ### Available Tools
 
 Once configured, these tools will be available:

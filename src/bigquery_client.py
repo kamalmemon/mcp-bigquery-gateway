@@ -28,7 +28,10 @@ class BigQueryClient:
             project_id: Google Cloud project ID. If None, uses default from environment.
             credentials_path: Path to service account JSON file. If None, uses ADC.
         """
-        self.executor = ThreadPoolExecutor(max_workers=4)
+        # Use ThreadPoolExecutor default logic for I/O-bound operations
+        # min(32, (os.cpu_count() or 1) + 4) adapts to system capabilities
+        max_workers = min(32, (os.cpu_count() or 1) + 4)
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.project_id = project_id
         self.credentials_path = credentials_path
         self.client = None

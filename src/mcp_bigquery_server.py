@@ -150,6 +150,24 @@ async def handle_list_tools() -> list[types.Tool]:
                 "required": ["query"],
             },
         ),
+        types.Tool(
+            name="get_job_details",
+            description="Get detailed information about a BigQuery job including full query text",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {
+                        "type": "string",
+                        "description": "BigQuery job ID",
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "Google Cloud project ID (optional)",
+                    },
+                },
+                "required": ["job_id"],
+            },
+        ),
     ]
 
 
@@ -255,6 +273,22 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[types.Text
             return [
                 types.TextContent(
                     type="text", text=f"Query validation: {json.dumps(validation_result, indent=2)}"
+                )
+            ]
+
+        elif name == "get_job_details":
+            job_id = arguments.get("job_id")
+            if not job_id:
+                return [types.TextContent(type="text", text="Error: job_id parameter is required")]
+
+            client = get_bigquery_client()
+            project_id = arguments.get("project_id")
+
+            job_details = await client.get_job_details(job_id=job_id, project_id=project_id)
+
+            return [
+                types.TextContent(
+                    type="text", text=f"Job Details:\n{json.dumps(job_details, indent=2)}"
                 )
             ]
 

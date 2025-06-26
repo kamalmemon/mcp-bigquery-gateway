@@ -19,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 class BigQueryClient:
     """Async wrapper for Google Cloud BigQuery client."""
+    
+    # Default billing limit: 500GB
+    DEFAULT_MAX_BYTES_BILLED = 500 * 1024 * 1024 * 1024
 
     def __init__(self, project_id: str | None = None, credentials_path: str | None = None):
         """
@@ -67,7 +70,7 @@ class BigQueryClient:
             raise
 
     async def execute_query(
-        self, query: str, project_id: str | None = None, max_results: int = 1000
+        self, query: str, project_id: str | None = None, max_results: int = 1000, max_bytes_billed: int | None = None
     ) -> list[dict[str, Any]]:
         """
         Execute a SQL query and return results.
@@ -76,6 +79,7 @@ class BigQueryClient:
             query: SQL query to execute
             project_id: Project ID to use (optional)
             max_results: Maximum number of results to return
+            max_bytes_billed: Maximum bytes to bill (defaults to 500GB)
 
         Returns:
             List of dictionaries representing query results
@@ -83,7 +87,7 @@ class BigQueryClient:
 
         def _run_query():
             job_config = bigquery.QueryJobConfig()
-            job_config.maximum_bytes_billed = 100 * 1024 * 1024  # 100 MB limit
+            job_config.maximum_bytes_billed = max_bytes_billed or self.DEFAULT_MAX_BYTES_BILLED
 
             client = self.client
             if project_id:
@@ -335,6 +339,67 @@ class BigQueryClient:
             raise
         except Exception as e:
             logger.error(f"Unexpected error getting table schema: {str(e)}")
+            raise
+
+    async def get_job_details(
+        self, job_id: str, project_id: str | None = None
+    ) -> dict[str, Any]:
+        """
+        Get detailed information about a BigQuery job including full query text.
+
+        Args:
+            job_id: BigQuery job ID
+            project_id: Project ID to use (optional)
+
+        Returns:
+            Job details dictionary including full query text
+        """
+
+        def _get_job():
+            client = self.client
+            if project_id:
+                client = bigquery.Client(project=project_id)
+
+            job = client.get_job(job_id)
+
+            result = {
+                "job_id": job.job_id,
+                "state": job.state,
+                "job_type": job.job_type,
+                "created": job.created.isoformat() if hasattr(job, "created") and job.created else None,
+                "started": job.started.isoformat() if hasattr(job, "started") and job.started else None,
+                "ended": job.ended.isoformat() if hasattr(job, "ended") and job.ended else None,
+                "user_email": job.user_email,
+                "total_bytes_processed": getattr(job, "total_bytes_processed", None),
+                "total_bytes_billed": getattr(job, "total_bytes_billed", None),
+                "total_slot_ms": getattr(job, "total_slot_ms", None),
+                "query": None,
+            }
+
+            # Get full query text if it's a query job
+            if hasattr(job, "query") and job.query:
+                result["query"] = job.query
+
+            # Add job config details if available
+            if hasattr(job, "job_config"):
+                config = job.job_config
+                result["dry_run"] = getattr(config, "dry_run", False)
+                result["use_query_cache"] = getattr(config, "use_query_cache", None)
+                result["maximum_bytes_billed"] = getattr(config, "maximum_bytes_billed", None)
+
+            return result
+
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(self.executor, _get_job)
+            logger.info(f"Retrieved job details for {job_id}")
+            return result
+
+        except GoogleCloudError as e:
+            logger.error(f"Error getting job details: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error getting job details: {str(e)}")
             raise
 
     def __del__(self):

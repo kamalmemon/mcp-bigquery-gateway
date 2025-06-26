@@ -108,6 +108,42 @@ class MCPTester:
             print("✅ Query validation tool works!")
             print(f"   Result: {validate_response['result']['content'][0]['text']}")
 
+            # 5. Test get_job_details tool (should be available)
+            print("\n🔧 Testing get_job_details tool availability...")
+            
+            # Check if get_job_details tool is in the list
+            job_details_tool = None
+            for tool in tools:
+                if tool['name'] == 'get_job_details':
+                    job_details_tool = tool
+                    break
+            
+            if job_details_tool is None:
+                print("❌ get_job_details tool not found in tools list")
+                return False
+            
+            print("✅ get_job_details tool is available!")
+            print(f"   Description: {job_details_tool['description']}")
+            
+            # Test the tool with a fake job_id (expect error but tool should be callable)
+            job_details_response = await self.send_request(
+                "tools/call", {
+                    "name": "get_job_details", 
+                    "arguments": {"job_id": "fake_job_id_for_testing"}
+                }
+            )
+            
+            # Should get an error (job doesn't exist) but the tool should be callable
+            if "error" in job_details_response:
+                print("✅ get_job_details tool is callable (expected error for fake job)")
+            else:
+                # Check if it's an error in the response content
+                response_text = job_details_response['result']['content'][0]['text']
+                if "Error:" in response_text:
+                    print("✅ get_job_details tool is callable (expected error for fake job)")
+                else:
+                    print("⚠️  get_job_details tool didn't return expected error for fake job")
+
             print("\n🎉 All tests passed! MCP server is working correctly.")
             return True
 

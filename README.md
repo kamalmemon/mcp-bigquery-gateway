@@ -49,7 +49,13 @@ Once configured, these tools will be available:
 - `list_tables` - List tables in a dataset
 - `get_table_schema` - Get table schema
 - `validate_query` - Validate SQL queries
+- `get_job_details` - Get full query text and job metadata for analysis
 
+## Use Cases
+
+### Query Optimization
+
+Identify and optimize expensive BigQuery queries using Claude. Ask for "the top 3 queries by slot time in the last 24 hours", then use `get_job_details` to retrieve the full query text for any high-cost job. Claude can then analyze the query and suggest optimizations like better partitioning, efficient joins, or reduced data scanning to potentially cut costs from 14TB to 1-2TB.
 
 ## Setup
 
